@@ -2,18 +2,68 @@
 
 A lightweight Windows tool that instantly gets file paths from clipboard - supports both **screenshots** and **files copied from Explorer**. Perfect for sharing with AI coding assistants like Claude Code.
 
-## The Problem
+---
 
-When using AI coding tools like **Claude Code**, sharing images or files is tedious:
+## Claude Code Native Image Paste Methods (Windows)
 
-**For screenshots:**
+Before using this tool, you should know that **Claude Code already has built-in image paste support**. Here are the native methods available on Windows:
+
+| Method | How to Use | Notes |
+|--------|------------|-------|
+| `Alt+V` | Paste clipboard image data | Works with screenshots (Snipaste, Win+Shift+S, WeChat copy image, etc.). **Does NOT work with files copied from Explorer** |
+| Drag & Drop | Drag image file to terminal | Most intuitive way |
+| Paste file path | Right-click to paste full path | Path will be auto-recognized as image |
+
+> **Source**: [Claude Code Keyboard Shortcuts](https://code.claude.com/docs/en/interactive-mode#keyboard-shortcuts)
+
+**Important Notes for Windows:**
+- `Ctrl+V` does NOT work in Windows terminal for pasting text - use right-click instead
+- `Alt+V` only works with **actual image data** in clipboard, not file references from Explorer
+
+---
+
+## Why This Tool Was Created
+
+This tool was created **before** discovering Claude Code's native `Alt+V` support. The original assumption was that the only way to share images with Claude Code was to paste file paths manually, which is tedious.
+
+**However, this tool still provides unique value** for scenarios not covered by native features.
+
+---
+
+## Remaining Advantages Over Native Features
+
+| Scenario | Native Claude Code | This Tool |
+|----------|-------------------|-----------|
+| Screenshot → Send to Claude | `Alt+V` pastes directly ✅ | Saves file first, then copies path |
+| **Explorer copied file → Get path** | ❌ Not supported (`Alt+V` shows "No image found") | ✅ `Ctrl+Shift+V` gets path instantly |
+| **Multi-file path extraction** | ❌ Must drag one by one or copy paths manually | ✅ Copy multiple files, get all paths at once |
+| **Auto-archive screenshots** | ❌ Not saved to disk | ✅ Screenshots saved to `D:\ClaudeImages\` |
+
+### When to Use This Tool
+
+✅ **Use this tool if you:**
+- Frequently copy files from Explorer and need their paths quickly
+- Want to keep a local archive of screenshots you share
+- Need to get multiple file paths at once
+
+❌ **Use native features instead if you:**
+- Just want to quickly share a screenshot → Use `Alt+V`
+- Want to share a single file → Drag & drop is easier
+
+---
+
+## The Problem (Original Motivation)
+
+When using AI coding tools like **Claude Code**, sharing images or files can be tedious without knowing the shortcuts:
+
+**For screenshots (without `Alt+V`):**
 1. Take a screenshot
 2. Open a file dialog, choose a folder
 3. Name the file, save it
 4. Copy the file path
 5. Paste the path to the AI tool
 
-**For existing files:**
+**For existing files (still a problem with native features):**
 1. Navigate to the file in Explorer
 2. Copy the full path from address bar (or Shift+Right-click → Copy as path)
 3. Paste the path to the AI tool
