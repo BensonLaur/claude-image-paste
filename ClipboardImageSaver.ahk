@@ -1,11 +1,15 @@
 ; ============================================================
-; ClipboardImageSaver - Quick clipboard image save tool
-; Quickly save screenshots and get the file path for AI tools
+; ClipboardImageSaver - Quick clipboard image/file path tool
+; Quickly get file paths from clipboard for AI tools
+;
+; Supports:
+;   - Screenshots (Snipaste, Win+Shift+S, etc.)
+;   - Files copied from Windows Explorer
 ;
 ; Usage:
-;   1. Take a screenshot (Snipaste, Win+Shift+S, etc.)
+;   1. Copy a file OR take a screenshot
 ;   2. Press Ctrl+Shift+V
-;   3. Image is saved and path is copied to clipboard
+;   3. File path is copied to clipboard
 ;   4. Paste the path to Claude Code or other AI tools
 ;
 ; Requires AutoHotkey v2: https://www.autohotkey.com/
@@ -20,7 +24,7 @@ SAVE_DIR := "D:\ClaudeImages"
 
 ; Hotkey: ^ = Ctrl, + = Shift, ! = Alt
 ; Default: Ctrl+Shift+V
-; To change, modify the hotkey definition below (line 32)
+; To change, modify the hotkey definition below (line 36)
 ; Examples: ^+s (Ctrl+Shift+S), ^!v (Ctrl+Alt+V)
 ; ===========================================================
 
@@ -29,7 +33,7 @@ if !DirExist(SAVE_DIR)
     DirCreate(SAVE_DIR)
 
 ; Register hotkey: Ctrl+Shift+V
-^+v::SaveClipboardImage()
+^+v::ProcessClipboard()
 
 ; Tray menu
 A_TrayMenu.Delete()
@@ -38,27 +42,41 @@ A_TrayMenu.Add("Exit", (*) => ExitApp())
 A_IconTip := "Clipboard Image Saver (Ctrl+Shift+V)"
 
 ; Startup notification
-TrayTip("Clipboard Image Saver", "Press Ctrl+Shift+V to save clipboard image", 1)
+TrayTip("Clipboard Image Saver", "Press Ctrl+Shift+V to get image/file path", 1)
 
-; Main function: Save clipboard image (using PowerShell)
-SaveClipboardImage(*) {
+; Main function: Process clipboard content
+ProcessClipboard(*) {
     global SAVE_DIR
 
-    ; Generate filename with timestamp
-    fileName := FormatTime(, "yyyyMMdd_HHmmss") . ".png"
-    filePath := SAVE_DIR . "\" . fileName
+    ; Output file for PowerShell result
+    resultFile := A_Temp . "\clipboard_result.txt"
+    if FileExist(resultFile)
+        FileDelete(resultFile)
 
-    ; Create PowerShell script file (avoids command line escaping issues)
-    psScriptPath := A_Temp . "\clipboard_save.ps1"
+    ; Generate filename with timestamp for potential image save
+    fileName := FormatTime(, "yyyyMMdd_HHmmss") . ".png"
+    imagePath := SAVE_DIR . "\" . fileName
+
+    ; Create PowerShell script with paths embedded directly
+    psScriptPath := A_Temp . "\clipboard_process.ps1"
     psScript := "
     (
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# Priority 1: Check for files copied from Explorer
+$fileList = [System.Windows.Forms.Clipboard]::GetFileDropList()
+if ($fileList.Count -gt 0) {
+    $paths = $fileList -join '|'
+    Set-Content -Path '<<<RESULTFILE>>>' -Value "FILES:$paths" -Encoding UTF8
+    exit
+}
+
+# Priority 2: Check for image in clipboard
 $data = [System.Windows.Forms.Clipboard]::GetDataObject()
 $img = $null
 
-# Method 1: Try PNG stream
+# Try PNG stream
 if ($data.GetDataPresent('PNG')) {
     $stream = $data.GetData('PNG')
     if ($stream) {
@@ -66,7 +84,7 @@ if ($data.GetDataPresent('PNG')) {
     }
 }
 
-# Method 2: Try image/png format
+# Try image/png format
 if ($img -eq $null -and $data.GetDataPresent('image/png')) {
     $stream = $data.GetData('image/png')
     if ($stream) {
@@ -74,32 +92,25 @@ if ($img -eq $null -and $data.GetDataPresent('image/png')) {
     }
 }
 
-# Method 3: Try standard GetImage
+# Try standard GetImage
 if ($img -eq $null) {
     $img = [System.Windows.Forms.Clipboard]::GetImage()
 }
 
-# Method 4: Try DIB format
-if ($img -eq $null -and $data.GetDataPresent([System.Windows.Forms.DataFormats]::Dib)) {
-    $dib = $data.GetData([System.Windows.Forms.DataFormats]::Dib)
-    if ($dib) {
-        $img = [System.Drawing.Image]::FromStream($dib)
-    }
-}
-
 if ($img -ne $null) {
-    $img.Save('FILEPATH', [System.Drawing.Imaging.ImageFormat]::Png)
+    $img.Save('<<<IMAGEPATH>>>', [System.Drawing.Imaging.ImageFormat]::Png)
     $img.Dispose()
-    Write-Output 'OK'
+    Set-Content -Path '<<<RESULTFILE>>>' -Value 'IMAGE:<<<IMAGEPATH>>>' -Encoding UTF8
 } else {
-    Write-Output 'NO_IMAGE'
+    Set-Content -Path '<<<RESULTFILE>>>' -Value 'NOTHING' -Encoding UTF8
 }
     )"
 
-    ; Replace file path placeholder
-    psScript := StrReplace(psScript, "FILEPATH", filePath)
+    ; Replace placeholders (using unique markers to avoid conflicts)
+    psScript := StrReplace(psScript, "<<<RESULTFILE>>>", resultFile)
+    psScript := StrReplace(psScript, "<<<IMAGEPATH>>>", imagePath)
 
-    ; Write temporary script file
+    ; Write PowerShell script
     if FileExist(psScriptPath)
         FileDelete(psScriptPath)
     FileAppend(psScript, psScriptPath, "UTF-8")
@@ -108,15 +119,44 @@ if ($img -ne $null) {
     try {
         RunWait('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' . psScriptPath . '"',, "Hide")
 
-        ; Check if file was created successfully
-        if FileExist(filePath) {
-            ; Copy path to clipboard
-            A_Clipboard := filePath
-            TrayTip("Saved", "Path copied:`n" . filePath, 1)
+        ; Read result
+        if !FileExist(resultFile) {
+            TrayTip("Error", "Failed to process clipboard", 3)
+            return
+        }
+
+        result := Trim(FileRead(resultFile))
+
+        if (SubStr(result, 1, 6) = "FILES:") {
+            ; Files from Explorer
+            filesStr := SubStr(result, 7)
+            files := StrSplit(filesStr, "|")
+
+            if (files.Length = 1) {
+                ; Single file
+                A_Clipboard := files[1]
+                SplitPath(files[1], &name)
+                TrayTip("File Path Copied", name, 1)
+            } else {
+                ; Multiple files
+                allPaths := ""
+                for index, f in files {
+                    allPaths .= f . "`n"
+                }
+                A_Clipboard := RTrim(allPaths, "`n")
+                TrayTip("File Paths Copied", files.Length . " files", 1)
+            }
+        } else if (SubStr(result, 1, 6) = "IMAGE:") {
+            ; Image saved
+            savedPath := SubStr(result, 7)
+            A_Clipboard := savedPath
+            SplitPath(savedPath, &name)
+            TrayTip("Image Saved", "Path copied: " . name, 1)
         } else {
-            TrayTip("Notice", "No image in clipboard", 2)
+            ; Nothing useful
+            TrayTip("Notice", "No image or file in clipboard", 2)
         }
     } catch as e {
-        TrayTip("Error", "Save failed: " . e.Message, 3)
+        TrayTip("Error", "Failed: " . e.Message, 3)
     }
 }

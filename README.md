@@ -1,24 +1,41 @@
 # Clipboard Image Saver
 
-A lightweight Windows tool that saves clipboard images with one hotkey and copies the file path - perfect for sharing screenshots with AI coding assistants like Claude Code.
+A lightweight Windows tool that instantly gets file paths from clipboard - supports both **screenshots** and **files copied from Explorer**. Perfect for sharing with AI coding assistants like Claude Code.
 
 ## The Problem
 
-When using AI coding tools like **Claude Code**, sharing screenshots is tedious:
+When using AI coding tools like **Claude Code**, sharing images or files is tedious:
+
+**For screenshots:**
 1. Take a screenshot
 2. Open a file dialog, choose a folder
 3. Name the file, save it
 4. Copy the file path
 5. Paste the path to the AI tool
 
+**For existing files:**
+1. Navigate to the file in Explorer
+2. Copy the full path from address bar (or Shift+Right-click → Copy as path)
+3. Paste the path to the AI tool
+
 ## The Solution
 
-With this tool:
-1. Take a screenshot
-2. Press `Ctrl+Shift+V`
-3. Paste the path - done!
+With this tool, just press `Ctrl+Shift+V`:
 
-The image is automatically saved and the file path is copied to your clipboard.
+| Clipboard Content | What Happens |
+|-------------------|--------------|
+| Screenshot | Saves image, copies path |
+| File(s) from Explorer | Copies file path(s) directly |
+
+**That's it!** One hotkey for both scenarios.
+
+## Features
+
+- **Screenshot to path**: Automatically saves clipboard images and copies the file path
+- **File to path**: Instantly get paths of files copied from Windows Explorer
+- **Multi-file support**: Copy multiple files, get all paths (one per line)
+- **Auto-install**: Automatically installs AutoHotkey if not present
+- **Lightweight**: Minimal resource usage, runs in system tray
 
 ## Requirements
 
@@ -41,16 +58,34 @@ The image is automatically saved and the file path is copied to your clipboard.
 
 ## Usage
 
+### For Screenshots
+
 ```
-Screenshot → Ctrl+Shift+V → Paste path to AI tool
+Take screenshot → Ctrl+Shift+V → Paste path
 ```
 
-1. Take a screenshot using any tool (Snipaste, Win+Shift+S, etc.)
+1. Take a screenshot (Snipaste, Win+Shift+S, etc.)
 2. Press `Ctrl+Shift+V`
-3. A notification confirms the save
-4. Paste (`Ctrl+V`) the path anywhere
+3. Image is saved, path is copied
+4. Paste (`Ctrl+V`) the path to Claude Code
 
-**Tray Menu**: Right-click the system tray icon to:
+### For Files from Explorer
+
+```
+Select file(s) → Ctrl+C → Ctrl+Shift+V → Paste path
+```
+
+1. Select file(s) in Windows Explorer
+2. Press `Ctrl+C` to copy
+3. Press `Ctrl+Shift+V`
+4. File path(s) copied to clipboard
+5. Paste (`Ctrl+V`) the path to Claude Code
+
+**Multi-file**: When multiple files are copied, all paths are copied (one per line).
+
+### Tray Menu
+
+Right-click the system tray icon (green **H**) to:
 - Open the image folder
 - Exit the tool
 
@@ -61,7 +96,7 @@ Edit `ClipboardImageSaver.ahk` to customize:
 ### Change Save Directory
 
 ```ahk
-; Line 19 - Change the save location
+; Line 23 - Change the save location
 SAVE_DIR := "D:\ClaudeImages"        ; Default
 SAVE_DIR := "C:\Screenshots"         ; Custom example
 SAVE_DIR := A_Desktop . "\Images"    ; Desktop/Images folder
@@ -70,11 +105,11 @@ SAVE_DIR := A_Desktop . "\Images"    ; Desktop/Images folder
 ### Change Hotkey
 
 ```ahk
-; Line 32 - Change the hotkey
-^+v::SaveClipboardImage()    ; Ctrl+Shift+V (default)
-^+s::SaveClipboardImage()    ; Ctrl+Shift+S
-^!v::SaveClipboardImage()    ; Ctrl+Alt+V
-#v::SaveClipboardImage()     ; Win+V
+; Line 36 - Change the hotkey
+^+v::ProcessClipboard()    ; Ctrl+Shift+V (default)
+^+s::ProcessClipboard()    ; Ctrl+Shift+S
+^!v::ProcessClipboard()    ; Ctrl+Alt+V
+#v::ProcessClipboard()     ; Win+V
 ```
 
 **Hotkey Symbols:**
@@ -95,10 +130,30 @@ To run automatically at startup:
 
 ## How It Works
 
-1. **Hotkey Detection**: AutoHotkey listens for `Ctrl+Shift+V`
-2. **Image Extraction**: PowerShell extracts the image from clipboard (supports multiple formats: PNG, DIB, Bitmap)
-3. **File Save**: Image is saved as PNG with timestamp filename (e.g., `20240115_143022.png`)
-4. **Path Copy**: The full file path is copied back to clipboard
+```
+┌─────────────────────────────────────────────────────────┐
+│                  Ctrl+Shift+V pressed                   │
+└─────────────────────────┬───────────────────────────────┘
+                          │
+                          ▼
+              ┌───────────────────────┐
+              │  Check clipboard type │
+              └───────────┬───────────┘
+                          │
+            ┌─────────────┴─────────────┐
+            │                           │
+            ▼                           ▼
+   ┌─────────────────┐        ┌─────────────────┐
+   │ Files from      │        │ Image data      │
+   │ Explorer?       │        │ (screenshot)?   │
+   └────────┬────────┘        └────────┬────────┘
+            │                          │
+            ▼                          ▼
+   ┌─────────────────┐        ┌─────────────────┐
+   │ Copy file       │        │ Save as PNG     │
+   │ path(s)         │        │ Copy path       │
+   └─────────────────┘        └─────────────────┘
+```
 
 ## Supported Screenshot Tools
 
@@ -111,9 +166,9 @@ Tested with:
 
 ## Troubleshooting
 
-### "No image in clipboard"
-- Make sure you've copied an image, not a file
-- Some apps copy images in unsupported formats - try a different screenshot tool
+### "No image or file in clipboard"
+- For screenshots: Make sure you've taken a screenshot (not just selected an area)
+- For files: Make sure you pressed `Ctrl+C` after selecting the file
 
 ### Hotkey doesn't work
 - Check if another app is using the same hotkey
@@ -126,10 +181,11 @@ Tested with:
 ## Files
 
 ```
-ClaudeImagePasteTool/
+claude-image-paste/
 ├── ClipboardImageSaver.ahk    # Main script
 ├── StartClipboardSaver.bat    # One-click launcher with auto-install
-└── README.md                  # This file
+├── README.md                  # This file
+└── LICENSE                    # MIT License
 ```
 
 ## License
@@ -142,4 +198,4 @@ Issues and pull requests are welcome!
 
 ## Acknowledgments
 
-Built for the Claude Code community and anyone who needs to share screenshots with AI tools quickly.
+Built for the Claude Code community and anyone who needs to share screenshots or files with AI tools quickly.
